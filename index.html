@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Skibidi Runners</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+        }
+        canvas {
+            display: block;
+        }
+        #score {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            font-size: 20px;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div id="score">Score: 0</div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        // Scene, Camera, Renderer
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        // Ground
+        const groundGeometry = new THREE.PlaneGeometry(10, 1000);
+        const groundMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff });
+        const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+        ground.rotation.x = -Math.PI / 2;
+        scene.add(ground);
+
+        // Player
+        const playerGeometry = new THREE.BoxGeometry(1, 1, 1);
+        const playerMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
+        const player = new THREE.Mesh(playerGeometry, playerMaterial);
+        player.position.y = 1;
+        scene.add(player);
+
+        // Obstacles
+        const obstacles = [];
+        const createObstacle = () => {
+            const obstacleGeometry = new THREE.BoxGeometry(1, 1, 1);
+            const obstacleMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+            const obstacle = new THREE.Mesh(obstacleGeometry, obstacleMaterial);
+            obstacle.position.set((Math.random() - 0.5) * 8, 1, -50);
+            scene.add(obstacle);
+            obstacles.push(obstacle);
+        };
+
+        // Game Variables
+        let score = 0;
+        let speed = 0.1;
+        let isJumping = false;
+        let jumpVelocity = 0;
+
+        // Controls
+        const keys = {};
+        window.addEventListener("keydown", (event) => {
+            keys[event.key] = true;
+        });
+        window.addEventListener("keyup", (event) => {
+            keys[event.key] = false;
+        });
+
+        // Game Loop
+        const animate = () => {
+            requestAnimationFrame(animate);
+
+            // Move player
+            if (keys["ArrowLeft"]) player.position.x -= 0.2;
+            if (keys["ArrowRight"]) player.position.x += 0.2;
+            if (keys[" "] && !isJumping) {
+                isJumping = true;
+                jumpVelocity = 0.2;
+            }
+
+            // Jump logic
+            if (isJumping) {
+                player.position.y += jumpVelocity;
+                jumpVelocity -= 0.01;
+                if (player.position.y <= 1) {
+                    player.position.y = 1;
+                    isJumping = false;
+                }
+            }
+
+            // Move ground and obstacles
+            ground.position.z += speed;
+            obstacles.forEach((obstacle) => {
+                obstacle.position.z += speed;
+                if (obstacle.position.z > 10) {
+                    scene.remove(obstacle);
+                    obstacles.splice(obstacles.indexOf(obstacle), 1);
+                    score++;
+                    document.getElementById("score").textContent = `Score: ${score}`;
+                }
+            });
+
+            // Spawn obstacles
+            if (Math.random() < 0.02) createObstacle();
+
+            // Speed increase
+            speed += 0.0001;
+
+            renderer.render(scene, camera);
+        };
+
+        // Start game
+        camera.position.z = 5;
+        animate();
+    </script>
+</body>
+</html>
