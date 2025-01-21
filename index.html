@@ -12,17 +12,47 @@
         canvas {
             display: block;
         }
-        #score {
+
+        /* Loading Screen */
+        #loading-screen {
             position: absolute;
-            top: 10px;
-            left: 10px;
-            font-size: 20px;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
             color: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            font-family: Arial, sans-serif;
+            z-index: 1;
+        }
+        #loading-bar {
+            width: 80%;
+            background-color: #555;
+            height: 20px;
+            border-radius: 10px;
+            margin-top: 20px;
+        }
+        #loading-progress {
+            height: 100%;
+            background-color: #00ff00;
+            border-radius: 10px;
+            width: 0%;
         }
     </style>
 </head>
 <body>
-    <div id="score">Score: 0</div>
+    <!-- Loading Screen -->
+    <div id="loading-screen">
+        <div id="loading-text">Skibidi Runners</div>
+        <div id="loading-bar">
+            <div id="loading-progress"></div>
+        </div>
+    </div>
+
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script>
         // Scene, Camera, Renderer
@@ -37,76 +67,14 @@
         light.position.set(5, 10, 5);
         scene.add(light);
 
-        // Create road (Three lanes)
+        // Road (Three lanes)
         const roadGeometry = new THREE.PlaneGeometry(12, 1000);
         const roadMaterial = new THREE.MeshLambertMaterial({ color: 0x808080 });
         const road = new THREE.Mesh(roadGeometry, roadMaterial);
         road.rotation.x = -Math.PI / 2;
         scene.add(road);
 
-        // Background buildings (simple skyscrapers)
-        const createBuilding = (x, z) => {
-            const buildingHeight = Math.random() * 15 + 5;
-            const buildingWidth = 2;
-            const buildingDepth = 2;
-            const buildingGeometry = new THREE.BoxGeometry(buildingWidth, buildingHeight, buildingDepth);
-            const buildingMaterial = new THREE.MeshLambertMaterial({ color: 0x555555 });
-            const building = new THREE.Mesh(buildingGeometry, buildingMaterial);
-            building.position.set(x, buildingHeight / 2, z);
-            scene.add(building);
-        };
-
-        for (let i = -30; i < 30; i += 5) {
-            createBuilding(i, -100);
-        }
-
-        // Snowflakes falling
-        const snowflakes = [];
-        const createSnowflake = () => {
-            const snowflakeGeometry = new THREE.SphereGeometry(0.1, 8, 8);
-            const snowflakeMaterial = new THREE.MeshLambertMaterial({ color: 0xffffff });
-            const snowflake = new THREE.Mesh(snowflakeGeometry, snowflakeMaterial);
-            snowflake.position.set(Math.random() * 20 - 10, Math.random() * 50 + 50, Math.random() * 200 - 200);
-            snowflakes.push(snowflake);
-            scene.add(snowflake);
-        };
-
-        for (let i = 0; i < 200; i++) {
-            createSnowflake();
-        }
-
-        // Snowy bushes (realistic)
-        const createBush = (x, z) => {
-            const bushGeometry = new THREE.SphereGeometry(1, 8, 8);
-            const bushMaterial = new THREE.MeshLambertMaterial({ color: 0x006400 });
-            const bush = new THREE.Mesh(bushGeometry, bushMaterial);
-            bush.position.set(x, 0.5, z);
-            scene.add(bush);
-        };
-
-        for (let i = -20; i < 20; i += 4) {
-            createBush(i, -50);
-        }
-
-        // Create lamps
-        const createLamp = (x, z) => {
-            const lampPoleGeometry = new THREE.CylinderGeometry(0.05, 0.05, 5, 16);
-            const lampBaseMaterial = new THREE.MeshLambertMaterial({ color: 0x444444 });
-            const lampTopGeometry = new THREE.SphereGeometry(0.3, 16, 16);
-            const lampTopMaterial = new THREE.MeshLambertMaterial({ color: 0xfff000 });
-            const pole = new THREE.Mesh(lampPoleGeometry, lampBaseMaterial);
-            pole.position.set(x, 2.5, z);
-            scene.add(pole);
-
-            const lampTop = new THREE.Mesh(lampTopGeometry, lampTopMaterial);
-            lampTop.position.set(x, 4, z);
-            scene.add(lampTop);
-        };
-
-        createLamp(-6, -50);
-        createLamp(6, -50);
-
-        // Player (Placeholder Skibidi-inspired model)
+        // Player (Running Animation Simulation)
         const playerGeometry = new THREE.CylinderGeometry(0.5, 0.5, 2, 32);
         const playerMaterial = new THREE.MeshLambertMaterial({ color: 0x0000ff });
         const player = new THREE.Mesh(playerGeometry, playerMaterial);
@@ -120,11 +88,7 @@
             const coinMaterial = new THREE.MeshLambertMaterial({ color: 0xffff00 });
             const coin = new THREE.Mesh(coinGeometry, coinMaterial);
             coin.rotation.x = Math.PI / 2;
-
-            // Randomly place coins in one of the three lanes
-            const lanes = [-4, 0, 4];
-            const randomLane = lanes[Math.floor(Math.random() * lanes.length)];
-            coin.position.set(randomLane, 1.5, -50);
+            coin.position.set(Math.random() * 10 - 5, 1.5, -50);
             scene.add(coin);
             coins.push(coin);
         };
@@ -135,11 +99,7 @@
             const obstacleGeometry = new THREE.BoxGeometry(1, 1, 1);
             const obstacleMaterial = new THREE.MeshLambertMaterial({ color: 0xff0000 });
             const obstacle = new THREE.Mesh(obstacleGeometry, obstacleMaterial);
-
-            // Randomly place obstacles in one of the three lanes
-            const lanes = [-4, 0, 4];
-            const randomLane = lanes[Math.floor(Math.random() * lanes.length)];
-            obstacle.position.set(randomLane, 1, -50);
+            obstacle.position.set(Math.random() * 8 - 4, 1, -50);
             scene.add(obstacle);
             obstacles.push(obstacle);
         };
@@ -153,34 +113,46 @@
         let jumpVelocity = 0;
         let gameOver = false;
 
+        // Loading Progress
+        let loadingProgress = 0;
+        const loadingText = document.getElementById("loading-text");
+        const loadingProgressElement = document.getElementById("loading-progress");
+
         // Controls
         const keys = {};
         window.addEventListener("keydown", (event) => {
             keys[event.key] = true;
-
-            // Move between lanes
-            if (event.key === "ArrowLeft" && currentLaneIndex > 0) {
-                currentLaneIndex--;
-                player.position.x = lanes[currentLaneIndex];
-            }
-            if (event.key === "ArrowRight" && currentLaneIndex < lanes.length - 1) {
-                currentLaneIndex++;
-                player.position.x = lanes[currentLaneIndex];
-            }
-
-            // Jump
-            if (event.key === " " && !isJumping && !gameOver) {
-                isJumping = true;
-                jumpVelocity = 0.3;
-            }
         });
         window.addEventListener("keyup", (event) => {
             keys[event.key] = false;
         });
 
-        // Game Loop
-        const animate = () => {
-            requestAnimationFrame(animate);
+        // Simulate running animation (Simple movement for now)
+        let runningAnimationTime = 0;
+        const animatePlayerRunning = () => {
+            runningAnimationTime += 0.05;
+            player.rotation.y = Math.sin(runningAnimationTime) * 0.3; // Simulate running animation with rotating player
+        };
+
+        // Game Loop for Loading Screen
+        const loadGame = () => {
+            if (loadingProgress < 100) {
+                loadingProgress += 0.5;
+                loadingProgressElement.style.width = loadingProgress + "%";
+
+                // Simulate player running animation during loading
+                animatePlayerRunning();
+                requestAnimationFrame(loadGame);
+            } else {
+                // Once loading is complete, hide the loading screen and start the game
+                document.getElementById("loading-screen").style.display = "none";
+                gameLoop();
+            }
+        };
+
+        // Game Loop for the actual game
+        const gameLoop = () => {
+            requestAnimationFrame(gameLoop);
 
             if (gameOver) return;
 
@@ -194,7 +166,7 @@
                 }
             }
 
-            // Move road, coins, obstacles, and snowflakes
+            // Move road, coins, obstacles
             road.position.z += speed;
 
             coins.forEach((coin, index) => {
@@ -203,17 +175,6 @@
                 if (coin.position.z > 10) {
                     scene.remove(coin);
                     coins.splice(index, 1);
-                }
-                // Check coin collection
-                if (
-                    Math.abs(player.position.x - coin.position.x) < 0.5 &&
-                    Math.abs(player.position.z - coin.position.z) < 0.5 &&
-                    Math.abs(player.position.y - coin.position.y) < 0.5
-                ) {
-                    scene.remove(coin);
-                    coins.splice(index, 1);
-                    score += 10;
-                    document.getElementById("score").textContent = `Score: ${score}`;
                 }
             });
 
@@ -232,7 +193,7 @@
                 ) {
                     // Game Over
                     gameOver = true;
-                    document.getElementById("score").textContent = `Game Over! Final Score: ${score}`;
+                    loadingText.textContent = `Game Over! Final Score: ${score}`;
                 }
             });
 
@@ -243,15 +204,6 @@
             // Speed increase
             speed += 0.0001;
 
-            // Falling snow
-            snowflakes.forEach((snowflake, index) => {
-                snowflake.position.y -= 0.1;
-                if (snowflake.position.y < -10) {
-                    snowflake.position.y = Math.random() * 50 + 50;
-                    snowflake.position.x = Math.random() * 20 - 10;
-                }
-            });
-
             // Camera follow player
             camera.position.set(player.position.x, player.position.y + 5, player.position.z + 10);
             camera.lookAt(player.position);
@@ -260,7 +212,8 @@
             renderer.render(scene, camera);
         };
 
-        animate();
+        // Start loading the game
+        loadGame();
     </script>
 </body>
 </html>
