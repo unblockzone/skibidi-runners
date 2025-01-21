@@ -37,31 +37,66 @@
         light.position.set(5, 10, 5);
         scene.add(light);
 
-        // Ground
-        const groundGeometry = new THREE.PlaneGeometry(20, 1000);
-        const groundMaterial = new THREE.MeshLambertMaterial({ color: 0xffffff });
+        // Ground (Three lanes like train tracks)
+        const groundWidth = 12;
+        const groundGeometry = new THREE.PlaneGeometry(groundWidth, 1000);
+        const groundMaterial = new THREE.MeshLambertMaterial({ color: 0xeeeeee });
         const ground = new THREE.Mesh(groundGeometry, groundMaterial);
         ground.rotation.x = -Math.PI / 2;
         scene.add(ground);
 
-        // Player (Placeholder Skibidi-inspired model)
-        const playerGroup = new THREE.Group();
+        // Background (Bushes and Lamps)
+        const createBackground = () => {
+            const bushGeometry = new THREE.SphereGeometry(0.5, 16, 16);
+            const bushMaterial = new THREE.MeshLambertMaterial({ color: 0x008000 });
 
-        const bodyGeometry = new THREE.CylinderGeometry(0.5, 0.5, 2, 32);
-        const bodyMaterial = new THREE.MeshLambertMaterial({ color: 0x0000ff });
-        const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
-        body.position.y = 1;
+            const lampGeometry = new THREE.CylinderGeometry(0.1, 0.1, 2, 16);
+            const lampMaterial = new THREE.MeshLambertMaterial({ color: 0x444444 });
 
-        const headGeometry = new THREE.BoxGeometry(1, 1, 1);
-        const headMaterial = new THREE.MeshLambertMaterial({ color: 0xff0000 });
-        const head = new THREE.Mesh(headGeometry, headMaterial);
-        head.position.y = 2.5;
+            for (let i = -5; i < 5; i++) {
+                // Bushes
+                const bush = new THREE.Mesh(bushGeometry, bushMaterial);
+                bush.position.set(-7, 0.5, i * 20);
+                scene.add(bush);
 
-        playerGroup.add(body);
-        playerGroup.add(head);
-        playerGroup.position.z = 0;
-        playerGroup.position.y = 1;
-        scene.add(playerGroup);
+                const bush2 = bush.clone();
+                bush2.position.set(7, 0.5, i * 20);
+                scene.add(bush2);
+
+                // Lamps
+                const lamp = new THREE.Mesh(lampGeometry, lampMaterial);
+                lamp.position.set(-8, 1, i * 20);
+                scene.add(lamp);
+
+                const lamp2 = lamp.clone();
+                lamp2.position.set(8, 1, i * 20);
+                scene.add(lamp2);
+            }
+        };
+        createBackground();
+
+        // Player
+        const playerGeometry = new THREE.CylinderGeometry(0.5, 0.5, 2, 32);
+        const playerMaterial = new THREE.MeshLambertMaterial({ color: 0x0000ff });
+        const player = new THREE.Mesh(playerGeometry, playerMaterial);
+        player.position.y = 1;
+        scene.add(player);
+
+        // Coins
+        const coins = [];
+        const createCoin = () => {
+            const coinGeometry = new THREE.TorusGeometry(0.3, 0.1, 16, 100);
+            const coinMaterial = new THREE.MeshLambertMaterial({ color: 0xffff00 });
+            const coin = new THREE.Mesh(coinGeometry, coinMaterial);
+            coin.rotation.x = Math.PI / 2;
+
+            // Randomly place coins in one of the three lanes
+            const lanes = [-4, 0, 4];
+            const randomLane = lanes[Math.floor(Math.random() * lanes.length)];
+            coin.position.set(randomLane, 1, -50);
+            scene.add(coin);
+            coins.push(coin);
+        };
 
         // Obstacles
         const obstacles = [];
@@ -69,7 +104,11 @@
             const obstacleGeometry = new THREE.BoxGeometry(1, 1, 1);
             const obstacleMaterial = new THREE.MeshLambertMaterial({ color: 0xff0000 });
             const obstacle = new THREE.Mesh(obstacleGeometry, obstacleMaterial);
-            obstacle.position.set((Math.random() - 0.5) * 8, 1, -50);
+
+            // Randomly place obstacles in one of the three lanes
+            const lanes = [-4, 0, 4];
+            const randomLane = lanes[Math.floor(Math.random() * lanes.length)];
+            obstacle.position.set(randomLane, 1, -50);
             scene.add(obstacle);
             obstacles.push(obstacle);
         };
@@ -77,6 +116,8 @@
         // Game Variables
         let score = 0;
         let speed = 0.2;
+        const lanes = [-4, 0, 4];
+        let currentLaneIndex = 1; // Start in the middle lane
         let isJumping = false;
         let jumpVelocity = 0;
 
@@ -84,6 +125,22 @@
         const keys = {};
         window.addEventListener("keydown", (event) => {
             keys[event.key] = true;
+
+            // Move between lanes
+            if (event.key === "ArrowLeft" && currentLaneIndex > 0) {
+                currentLaneIndex--;
+                player.position.x = lanes[currentLaneIndex];
+            }
+            if (event.key === "ArrowRight" && currentLaneIndex < lanes.length - 1) {
+                currentLaneIndex++;
+                player.position.x = lanes[currentLaneIndex];
+            }
+
+            // Jump
+            if (event.key === " " && !isJumping) {
+                isJumping = true;
+                jumpVelocity = 0.3;
+            }
         });
         window.addEventListener("keyup", (event) => {
             keys[event.key] = false;
@@ -93,45 +150,56 @@
         const animate = () => {
             requestAnimationFrame(animate);
 
-            // Move player
-            if (keys["ArrowLeft"] && playerGroup.position.x > -9) playerGroup.position.x -= 0.2;
-            if (keys["ArrowRight"] && playerGroup.position.x < 9) playerGroup.position.x += 0.2;
-            if (keys[" "] && !isJumping) {
-                isJumping = true;
-                jumpVelocity = 0.3;
-            }
-
             // Jump logic
             if (isJumping) {
-                playerGroup.position.y += jumpVelocity;
+                player.position.y += jumpVelocity;
                 jumpVelocity -= 0.01;
-                if (playerGroup.position.y <= 1) {
-                    playerGroup.position.y = 1;
+                if (player.position.y <= 1) {
+                    player.position.y = 1;
                     isJumping = false;
                 }
             }
 
-            // Move ground and obstacles
+            // Move ground, coins, and obstacles
             ground.position.z += speed;
-            obstacles.forEach((obstacle) => {
-                obstacle.position.z += speed;
-                if (obstacle.position.z > 10) {
-                    scene.remove(obstacle);
-                    obstacles.splice(obstacles.indexOf(obstacle), 1);
-                    score++;
+
+            coins.forEach((coin, index) => {
+                coin.position.z += speed;
+                if (coin.position.z > 10) {
+                    scene.remove(coin);
+                    coins.splice(index, 1);
+                }
+                // Check coin collection
+                if (
+                    Math.abs(player.position.x - coin.position.x) < 0.5 &&
+                    Math.abs(player.position.z - coin.position.z) < 0.5 &&
+                    Math.abs(player.position.y - coin.position.y) < 0.5
+                ) {
+                    scene.remove(coin);
+                    coins.splice(index, 1);
+                    score += 10;
                     document.getElementById("score").textContent = `Score: ${score}`;
                 }
             });
 
-            // Spawn obstacles
+            obstacles.forEach((obstacle, index) => {
+                obstacle.position.z += speed;
+                if (obstacle.position.z > 10) {
+                    scene.remove(obstacle);
+                    obstacles.splice(index, 1);
+                }
+            });
+
+            // Spawn coins and obstacles
+            if (Math.random() < 0.02) createCoin();
             if (Math.random() < 0.02) createObstacle();
 
             // Speed increase
             speed += 0.0001;
 
-            // Update camera position
-            camera.position.set(playerGroup.position.x, playerGroup.position.y + 2, playerGroup.position.z + 5);
-            camera.lookAt(playerGroup.position);
+            // Camera follow player
+            camera.position.set(player.position.x, player.position.y + 2, player.position.z + 5);
+            camera.lookAt(player.position);
 
             renderer.render(scene, camera);
         };
