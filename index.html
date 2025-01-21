@@ -55,106 +55,121 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script>
-        // Scene, Camera, Renderer
-        const scene = new THREE.Scene();
-        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-        const renderer = new THREE.WebGLRenderer();
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        document.body.appendChild(renderer.domElement);
-
-        // Lighting
-        const light = new THREE.DirectionalLight(0xffffff, 1);
-        light.position.set(5, 10, 5);
-        scene.add(light);
-
-        // Road (Three lanes)
-        const roadGeometry = new THREE.PlaneGeometry(12, 1000);
-        const roadMaterial = new THREE.MeshLambertMaterial({ color: 0x808080 });
-        const road = new THREE.Mesh(roadGeometry, roadMaterial);
-        road.rotation.x = -Math.PI / 2;
-        scene.add(road);
-
-        // Player (Running Animation Simulation)
-        const playerGeometry = new THREE.CylinderGeometry(0.5, 0.5, 2, 32);
-        const playerMaterial = new THREE.MeshLambertMaterial({ color: 0x0000ff });
-        const player = new THREE.Mesh(playerGeometry, playerMaterial);
-        player.position.y = 1;
-        scene.add(player);
-
-        // Coins (Floating and spinning)
-        const coins = [];
-        const createCoin = () => {
-            const coinGeometry = new THREE.TorusGeometry(0.3, 0.1, 16, 100);
-            const coinMaterial = new THREE.MeshLambertMaterial({ color: 0xffff00 });
-            const coin = new THREE.Mesh(coinGeometry, coinMaterial);
-            coin.rotation.x = Math.PI / 2;
-            coin.position.set(Math.random() * 10 - 5, 1.5, -50);
-            scene.add(coin);
-            coins.push(coin);
-        };
-
-        // Obstacles
-        const obstacles = [];
-        const createObstacle = () => {
-            const obstacleGeometry = new THREE.BoxGeometry(1, 1, 1);
-            const obstacleMaterial = new THREE.MeshLambertMaterial({ color: 0xff0000 });
-            const obstacle = new THREE.Mesh(obstacleGeometry, obstacleMaterial);
-            obstacle.position.set(Math.random() * 8 - 4, 1, -50);
-            scene.add(obstacle);
-            obstacles.push(obstacle);
-        };
-
         // Game Variables
-        let score = 0;
-        let speed = 0.2;
-        const lanes = [-4, 0, 4];
-        let currentLaneIndex = 1; // Start in the middle lane
-        let isJumping = false;
-        let jumpVelocity = 0;
-        let gameOver = false;
+        let scene, camera, renderer;
+        let player, speed, score, jumpVelocity, isJumping, gameOver;
+        let coins, toilets, snowflakes;
+        let lanes, currentLaneIndex;
+        let keys;
+        let loadingProgress, loadingText, loadingProgressElement;
+        let gradientShift;
 
-        // Loading Progress
-        let loadingProgress = 0;
-        const loadingText = document.getElementById("loading-text");
-        const loadingProgressElement = document.getElementById("loading-progress");
+        // Initialize the game
+        function init() {
+            // Scene, Camera, Renderer
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            renderer = new THREE.WebGLRenderer();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            document.body.appendChild(renderer.domElement);
 
-        // Controls
-        const keys = {};
-        window.addEventListener("keydown", (event) => {
-            keys[event.key] = true;
-        });
-        window.addEventListener("keyup", (event) => {
-            keys[event.key] = false;
-        });
+            // Lighting
+            const light = new THREE.DirectionalLight(0xffffff, 1);
+            light.position.set(5, 10, 5);
+            scene.add(light);
 
-        // Simulate running animation (Simple movement for now)
-        let runningAnimationTime = 0;
-        const animatePlayerRunning = () => {
-            runningAnimationTime += 0.05;
-            player.rotation.y = Math.sin(runningAnimationTime) * 0.3; // Simulate running animation with rotating player
-        };
+            // Road (Three lanes)
+            const roadGeometry = new THREE.PlaneGeometry(12, 1000);
+            const roadMaterial = new THREE.MeshLambertMaterial({ color: 0x808080 });
+            const road = new THREE.Mesh(roadGeometry, roadMaterial);
+            road.rotation.x = -Math.PI / 2;
+            scene.add(road);
 
-        // Game Loop for Loading Screen
+            // Player (Running Animation Simulation)
+            const playerGeometry = new THREE.CylinderGeometry(0.5, 0.5, 2, 32);
+            const playerMaterial = new THREE.MeshLambertMaterial({ color: 0x0000ff });
+            player = new THREE.Mesh(playerGeometry, playerMaterial);
+            player.position.y = 1;
+            scene.add(player);
+
+            // Initialize game variables
+            coins = [];
+            toilets = [];
+            snowflakes = [];
+            lanes = [-4, 0, 4];
+            currentLaneIndex = 1; // Start in the middle lane
+            speed = 0.2;
+            score = 0;
+            isJumping = false;
+            jumpVelocity = 0;
+            gameOver = false;
+
+            // Controls
+            keys = {};
+            window.addEventListener("keydown", (event) => {
+                keys[event.key] = true;
+            });
+            window.addEventListener("keyup", (event) => {
+                keys[event.key] = false;
+            });
+
+            // Game loop
+            gameLoop();
+        }
+
+        // Loading progress and setup
+        loadingProgress = 0;
+        loadingText = document.getElementById("loading-text");
+        loadingProgressElement = document.getElementById("loading-progress");
+
+        // Loading screen loop
         const loadGame = () => {
             if (loadingProgress < 100) {
                 loadingProgress += 0.5;
                 loadingProgressElement.style.width = loadingProgress + "%";
-
-                // Simulate player running animation during loading
-                animatePlayerRunning();
                 requestAnimationFrame(loadGame);
             } else {
-                // Once loading is complete, hide the loading screen and start the game
                 document.getElementById("loading-screen").style.display = "none";
-                gameLoop();
+                init();
             }
         };
 
-        // Game Loop for the actual game
-        const gameLoop = () => {
+        // Restart the game
+        function restartGame() {
+            // Clear existing objects and reset variables
+            scene.clear();
+
+            // Reset game state
+            player.position.set(0, 1, 0);
+            speed = 0.2;
+            score = 0;
+            isJumping = false;
+            jumpVelocity = 0;
+            gameOver = false;
+
+            // Reset coins, toilets, and snowflakes
+            coins.forEach(coin => scene.remove(coin));
+            toilets.forEach(toilet => scene.remove(toilet));
+            snowflakes.forEach(snowflake => scene.remove(snowflake));
+
+            coins = [];
+            toilets = [];
+            snowflakes = [];
+
+            // Restart the game loop
+            gameLoop();
+        }
+
+        // Game Loop
+        function gameLoop() {
             requestAnimationFrame(gameLoop);
 
-            if (gameOver) return;
+            if (gameOver) {
+                setTimeout(() => {
+                    restartGame();
+                }, 2000); // Restart after a short delay
+                return;
+            }
 
             // Jump logic
             if (isJumping) {
@@ -167,6 +182,7 @@
             }
 
             // Move road, coins, obstacles
+            const road = scene.children.find(child => child instanceof THREE.Mesh && child.geometry.type === 'PlaneGeometry');
             road.position.z += speed;
 
             coins.forEach((coin, index) => {
@@ -178,31 +194,50 @@
                 }
             });
 
-            obstacles.forEach((obstacle, index) => {
-                obstacle.position.z += speed;
-                if (obstacle.position.z > 10) {
-                    scene.remove(obstacle);
-                    obstacles.splice(index, 1);
+            snowflakes.forEach((snowflake) => {
+                snowflake.position.y -= 0.05;
+                if (snowflake.position.y < -10) {
+                    snowflake.position.y = Math.random() * 20 + 10;
+                }
+            });
+
+            toilets.forEach((toilet, index) => {
+                toilet.position.z += speed;
+                if (toilet.position.z > 10) {
+                    scene.remove(toilet);
+                    toilets.splice(index, 1);
                 }
 
                 // Check for collision
                 if (
-                    Math.abs(player.position.x - obstacle.position.x) < 0.5 &&
-                    Math.abs(player.position.z - obstacle.position.z) < 0.5 &&
-                    Math.abs(player.position.y - obstacle.position.y) < 1
+                    Math.abs(player.position.x - toilet.position.x) < 0.5 &&
+                    Math.abs(player.position.z - toilet.position.z) < 0.5 &&
+                    Math.abs(player.position.y - toilet.position.y) < 1
                 ) {
-                    // Game Over
                     gameOver = true;
                     loadingText.textContent = `Game Over! Final Score: ${score}`;
                 }
             });
 
-            // Spawn coins and obstacles
+            // Spawn coins, toilets, and snowflakes
             if (Math.random() < 0.02) createCoin();
-            if (Math.random() < 0.02) createObstacle();
+            if (Math.random() < 0.02) createToilet();
+            if (Math.random() < 0.05) createSnowflake();
 
             // Speed increase
             speed += 0.0001;
+
+            // Arrow Key Movement
+            if (keys["ArrowLeft"] && currentLaneIndex > 0) {
+                player.position.x = lanes[--currentLaneIndex];
+            }
+            if (keys["ArrowRight"] && currentLaneIndex < lanes.length - 1) {
+                player.position.x = lanes[++currentLaneIndex];
+            }
+            if (keys["ArrowUp"] && !isJumping) {
+                isJumping = true;
+                jumpVelocity = 0.3;
+            }
 
             // Camera follow player
             camera.position.set(player.position.x, player.position.y + 5, player.position.z + 10);
@@ -210,7 +245,38 @@
 
             // Render the scene
             renderer.render(scene, camera);
-        };
+        }
+
+        // Create a coin
+        function createCoin() {
+            const coinGeometry = new THREE.TorusGeometry(0.3, 0.1, 16, 100);
+            const coinMaterial = new THREE.MeshLambertMaterial({ color: 0xffff00 });
+            const coin = new THREE.Mesh(coinGeometry, coinMaterial);
+            coin.rotation.x = Math.PI / 2;
+            coin.position.set(Math.random() * 10 - 5, 1.5, -50);
+            scene.add(coin);
+            coins.push(coin);
+        }
+
+        // Create a toilet (obstacle)
+        function createToilet() {
+            const toiletGeometry = new THREE.CylinderGeometry(0.5, 0.5, 2, 32);
+            const toiletMaterial = new THREE.MeshLambertMaterial({ color: 0xffffff });
+            const toilet = new THREE.Mesh(toiletGeometry, toiletMaterial);
+            toilet.position.set(Math.random() * 8 - 4, 1, -50);
+            scene.add(toilet);
+            toilets.push(toilet);
+        }
+
+        // Create a snowflake
+        function createSnowflake() {
+            const snowflakeGeometry = new THREE.SphereGeometry(0.1, 8, 8);
+            const snowflakeMaterial = new THREE.MeshLambertMaterial({ color: 0xffffff });
+            const snowflake = new THREE.Mesh(snowflakeGeometry, snowflakeMaterial);
+            snowflake.position.set(Math.random() * 20 - 10, Math.random() * 20 + 10, Math.random() * 20 - 10);
+            scene.add(snowflake);
+            snowflakes.push(snowflake);
+        }
 
         // Start loading the game
         loadGame();
