@@ -37,45 +37,60 @@
         light.position.set(5, 10, 5);
         scene.add(light);
 
-        // Ground (Three lanes like train tracks)
-        const groundWidth = 12;
-        const groundGeometry = new THREE.PlaneGeometry(groundWidth, 1000);
-        const groundMaterial = new THREE.MeshLambertMaterial({ color: 0xeeeeee });
-        const ground = new THREE.Mesh(groundGeometry, groundMaterial);
-        ground.rotation.x = -Math.PI / 2;
-        scene.add(ground);
+        // Create road
+        const roadGeometry = new THREE.PlaneGeometry(12, 1000);
+        const roadMaterial = new THREE.MeshLambertMaterial({ color: 0x808080 });
+        const road = new THREE.Mesh(roadGeometry, roadMaterial);
+        road.rotation.x = -Math.PI / 2;
+        scene.add(road);
 
-        // Background (Bushes and Lamps)
-        const createBackground = () => {
-            const bushGeometry = new THREE.SphereGeometry(0.5, 16, 16);
-            const bushMaterial = new THREE.MeshLambertMaterial({ color: 0x008000 });
+        // Background buildings (simple skyscrapers)
+        const createBuilding = (x, z) => {
+            const buildingHeight = Math.random() * 15 + 5;
+            const buildingWidth = 2;
+            const buildingDepth = 2;
+            const buildingGeometry = new THREE.BoxGeometry(buildingWidth, buildingHeight, buildingDepth);
+            const buildingMaterial = new THREE.MeshLambertMaterial({ color: 0x555555 });
+            const building = new THREE.Mesh(buildingGeometry, buildingMaterial);
+            building.position.set(x, buildingHeight / 2, z);
+            scene.add(building);
+        };
 
-            const lampGeometry = new THREE.CylinderGeometry(0.1, 0.1, 2, 16);
-            const lampMaterial = new THREE.MeshLambertMaterial({ color: 0x444444 });
+        for (let i = -30; i < 30; i += 5) {
+            createBuilding(i, -100);
+        }
 
-            for (let i = -5; i < 5; i++) {
-                // Bushes
-                const bush = new THREE.Mesh(bushGeometry, bushMaterial);
-                bush.position.set(-7, 0.5, i * 20);
-                scene.add(bush);
-
-                const bush2 = bush.clone();
-                bush2.position.set(7, 0.5, i * 20);
-                scene.add(bush2);
-
-                // Lamps
-                const lamp = new THREE.Mesh(lampGeometry, lampMaterial);
-                lamp.position.set(-8, 1, i * 20);
-                scene.add(lamp);
-
-                const lamp2 = lamp.clone();
-                lamp2.position.set(8, 1, i * 20);
-                scene.add(lamp2);
+        // Snowy elements (trees, bushes, snow)
+        const createSnow = () => {
+            const snowMaterial = new THREE.MeshLambertMaterial({ color: 0xffffff });
+            for (let i = -20; i < 20; i++) {
+                const snowflake = new THREE.SphereGeometry(0.2, 8, 8);
+                const snowMesh = new THREE.Mesh(snowflake, snowMaterial);
+                snowMesh.position.set(i * 1.5, 0.2, Math.random() * 100 - 200);
+                scene.add(snowMesh);
             }
         };
-        createBackground();
+        createSnow();
 
-        // Player
+        // Create lamps
+        const createLamp = (x, z) => {
+            const lampPoleGeometry = new THREE.CylinderGeometry(0.05, 0.05, 5, 16);
+            const lampBaseMaterial = new THREE.MeshLambertMaterial({ color: 0x444444 });
+            const lampTopGeometry = new THREE.SphereGeometry(0.3, 16, 16);
+            const lampTopMaterial = new THREE.MeshLambertMaterial({ color: 0xfff000 });
+            const pole = new THREE.Mesh(lampPoleGeometry, lampBaseMaterial);
+            pole.position.set(x, 2.5, z);
+            scene.add(pole);
+
+            const lampTop = new THREE.Mesh(lampTopGeometry, lampTopMaterial);
+            lampTop.position.set(x, 4, z);
+            scene.add(lampTop);
+        };
+
+        createLamp(-6, -50);
+        createLamp(6, -50);
+
+        // Player (Placeholder Skibidi-inspired model)
         const playerGeometry = new THREE.CylinderGeometry(0.5, 0.5, 2, 32);
         const playerMaterial = new THREE.MeshLambertMaterial({ color: 0x0000ff });
         const player = new THREE.Mesh(playerGeometry, playerMaterial);
@@ -160,8 +175,8 @@
                 }
             }
 
-            // Move ground, coins, and obstacles
-            ground.position.z += speed;
+            // Move road, coins, and obstacles
+            road.position.z += speed;
 
             coins.forEach((coin, index) => {
                 coin.position.z += speed;
