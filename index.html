@@ -37,7 +37,7 @@
         light.position.set(5, 10, 5);
         scene.add(light);
 
-        // Create road
+        // Create road (Three lanes)
         const roadGeometry = new THREE.PlaneGeometry(12, 1000);
         const roadMaterial = new THREE.MeshLambertMaterial({ color: 0x808080 });
         const road = new THREE.Mesh(roadGeometry, roadMaterial);
@@ -60,17 +60,33 @@
             createBuilding(i, -100);
         }
 
-        // Snowy elements (trees, bushes, snow)
-        const createSnow = () => {
-            const snowMaterial = new THREE.MeshLambertMaterial({ color: 0xffffff });
-            for (let i = -20; i < 20; i++) {
-                const snowflake = new THREE.SphereGeometry(0.2, 8, 8);
-                const snowMesh = new THREE.Mesh(snowflake, snowMaterial);
-                snowMesh.position.set(i * 1.5, 0.2, Math.random() * 100 - 200);
-                scene.add(snowMesh);
-            }
+        // Snowflakes falling
+        const snowflakes = [];
+        const createSnowflake = () => {
+            const snowflakeGeometry = new THREE.SphereGeometry(0.1, 8, 8);
+            const snowflakeMaterial = new THREE.MeshLambertMaterial({ color: 0xffffff });
+            const snowflake = new THREE.Mesh(snowflakeGeometry, snowflakeMaterial);
+            snowflake.position.set(Math.random() * 20 - 10, Math.random() * 50 + 50, Math.random() * 200 - 200);
+            snowflakes.push(snowflake);
+            scene.add(snowflake);
         };
-        createSnow();
+
+        for (let i = 0; i < 200; i++) {
+            createSnowflake();
+        }
+
+        // Snowy bushes (realistic)
+        const createBush = (x, z) => {
+            const bushGeometry = new THREE.SphereGeometry(1, 8, 8);
+            const bushMaterial = new THREE.MeshLambertMaterial({ color: 0x006400 });
+            const bush = new THREE.Mesh(bushGeometry, bushMaterial);
+            bush.position.set(x, 0.5, z);
+            scene.add(bush);
+        };
+
+        for (let i = -20; i < 20; i += 4) {
+            createBush(i, -50);
+        }
 
         // Create lamps
         const createLamp = (x, z) => {
@@ -97,7 +113,7 @@
         player.position.y = 1;
         scene.add(player);
 
-        // Coins
+        // Coins (Floating and spinning)
         const coins = [];
         const createCoin = () => {
             const coinGeometry = new THREE.TorusGeometry(0.3, 0.1, 16, 100);
@@ -108,7 +124,7 @@
             // Randomly place coins in one of the three lanes
             const lanes = [-4, 0, 4];
             const randomLane = lanes[Math.floor(Math.random() * lanes.length)];
-            coin.position.set(randomLane, 1, -50);
+            coin.position.set(randomLane, 1.5, -50);
             scene.add(coin);
             coins.push(coin);
         };
@@ -135,6 +151,7 @@
         let currentLaneIndex = 1; // Start in the middle lane
         let isJumping = false;
         let jumpVelocity = 0;
+        let gameOver = false;
 
         // Controls
         const keys = {};
@@ -152,7 +169,7 @@
             }
 
             // Jump
-            if (event.key === " " && !isJumping) {
+            if (event.key === " " && !isJumping && !gameOver) {
                 isJumping = true;
                 jumpVelocity = 0.3;
             }
@@ -165,6 +182,8 @@
         const animate = () => {
             requestAnimationFrame(animate);
 
+            if (gameOver) return;
+
             // Jump logic
             if (isJumping) {
                 player.position.y += jumpVelocity;
@@ -175,11 +194,12 @@
                 }
             }
 
-            // Move road, coins, and obstacles
+            // Move road, coins, obstacles, and snowflakes
             road.position.z += speed;
 
             coins.forEach((coin, index) => {
                 coin.position.z += speed;
+                coin.rotation.y += 0.1; // Spinning effect
                 if (coin.position.z > 10) {
                     scene.remove(coin);
                     coins.splice(index, 1);
@@ -203,6 +223,17 @@
                     scene.remove(obstacle);
                     obstacles.splice(index, 1);
                 }
+
+                // Check for collision
+                if (
+                    Math.abs(player.position.x - obstacle.position.x) < 0.5 &&
+                    Math.abs(player.position.z - obstacle.position.z) < 0.5 &&
+                    Math.abs(player.position.y - obstacle.position.y) < 1
+                ) {
+                    // Game Over
+                    gameOver = true;
+                    document.getElementById("score").textContent = `Game Over! Final Score: ${score}`;
+                }
             });
 
             // Spawn coins and obstacles
@@ -212,15 +243,23 @@
             // Speed increase
             speed += 0.0001;
 
+            // Falling snow
+            snowflakes.forEach((snowflake, index) => {
+                snowflake.position.y -= 0.1;
+                if (snowflake.position.y < -10) {
+                    snowflake.position.y = Math.random() * 50 + 50;
+                    snowflake.position.x = Math.random() * 20 - 10;
+                }
+            });
+
             // Camera follow player
-            camera.position.set(player.position.x, player.position.y + 2, player.position.z + 5);
+            camera.position.set(player.position.x, player.position.y + 5, player.position.z + 10);
             camera.lookAt(player.position);
 
+            // Render the scene
             renderer.render(scene, camera);
         };
 
-        // Start game
-        camera.position.z = 10;
         animate();
     </script>
 </body>
