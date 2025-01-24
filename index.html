@@ -1,70 +1,207 @@
-# Subway Surfers Game Clone
 
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Subway Surfers Clone</title>
+    <title>Skibidi Runners</title>
     <style>
         body {
             margin: 0;
             overflow: hidden;
-            background: #f0f0f0;
+            background: linear-gradient(to bottom, #2e1c7c, #1a0e4f); /* Dark blue and purple gradient */
         }
         canvas {
             display: block;
-            margin: auto;
-            background: #87CEEB;
         }
     </style>
 </head>
 <body>
-    <canvas id="gameCanvas" width="480" height="320"></canvas>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script>
-        const canvas = document.getElementById('gameCanvas');
-        const ctx = canvas.getContext('2d');
+        // Core variables
+        let scene, camera, renderer, player, lanes, currentLane, speed, gameObjects, snowflakes, cityBuildings;
+        const lanePositions = [-4, 0, 4]; // Three lanes
+        const keys = {};
 
-        let player = {
-            x: 50,
-            y: 150,
-            width: 30,
-            height: 30,
-            speed: 2,
-            jump: false,
-            gravity: 0.5,
-            velocityY: 0
-        };
+        // Initialize game
+        function init() {
+            // Set up the scene
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            renderer = new THREE.WebGLRenderer();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            document.body.appendChild(renderer.domElement);
 
-        function drawPlayer() {
-            ctx.fillStyle = 'orange';
-            ctx.fillRect(player.x, player.y, player.width, player.height);
+            // Light
+            const light = new THREE.DirectionalLight(0xffffff, 0.8);
+            light.position.set(10, 20, 10);
+            scene.add(light);
+
+            // Road
+            const roadGeometry = new THREE.PlaneGeometry(12, 1000);
+            const roadMaterial = new THREE.MeshLambertMaterial({ color: 0x404040 });
+            const road = new THREE.Mesh(roadGeometry, roadMaterial);
+            road.rotation.x = -Math.PI / 2;
+            scene.add(road);
+
+            // Stickman player
+            const bodyGeometry = new THREE.CylinderGeometry(0.3, 0.3, 2, 16);
+            const bodyMaterial = new THREE.MeshLambertMaterial({ color: 0x000000 });
+            const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+            body.position.y = 1;
+
+            const headGeometry = new THREE.SphereGeometry(0.5, 16, 16);
+            const headMaterial = new THREE.MeshLambertMaterial({ color: 0xffffff });
+            const head = new THREE.Mesh(headGeometry, headMaterial);
+            head.position.y = 2;
+
+            player = new THREE.Group();
+            player.add(body);
+            player.add(head);
+            player.position.set(0, 0, 5);
+            scene.add(player);
+
+            // Variables
+            currentLane = 1; // Start in the middle lane
+            speed = 0.2;
+            gameObjects = [];
+            snowflakes = [];
+            cityBuildings = [];
+
+            // Controls
+            window.addEventListener('keydown', (e) => (keys[e.key] = true));
+            window.addEventListener('keyup', (e) => (keys[e.key] = false));
+
+            // Add objects and snowflakes
+            spawnCoins();
+            spawnSnowflakes();
+            createCity();
+
+            // Start the game loop
+            camera.position.set(0, 5, 15);
+            camera.lookAt(player.position);
+            animate();
         }
 
-        function update() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            drawPlayer();
+        // Spawning fewer coins in lanes
+        function spawnCoins() {
+            const coinGeometry = new THREE.CylinderGeometry(0.4, 0.4, 0.5, 16);
+            const coinMaterial = new THREE.MeshLambertMaterial({ color: 0xffd700 });
+            for (let i = 0; i < 10; i++) { // Fewer coins now
+                const coin = new THREE.Mesh(coinGeometry, coinMaterial);
+                coin.position.set(
+                    lanePositions[Math.floor(Math.random() * 3)],
+                    0.5,
+                    -Math.random() * 100
+                );
+                coin.rotation.x = Math.PI / 2;
+                scene.add(coin);
+                gameObjects.push({ object: coin, type: 'coin' });
+            }
+        }
 
-            if (player.jump) {
-                player.velocityY -= player.gravity;
-                player.y -= player.velocityY;
-                if (player.y >= 150) {
-                    player.y = 150;
-                    player.jump = false;
-                    player.velocityY = 0;
+        // Spawning snowflakes
+        function spawnSnowflakes() {
+            for (let i = 0; i < 100; i++) {
+                const snowflakeGeometry = new THREE.SphereGeometry(0.1, 8, 8);
+                const snowflakeMaterial = new THREE.MeshLambertMaterial({ color: 0xffffff });
+                const snowflake = new THREE.Mesh(snowflakeGeometry, snowflakeMaterial);
+                snowflake.position.set(
+                    Math.random() * 20 - 10,
+                    Math.random() * 10 + 5,
+                    Math.random() * -50
+                );
+                scene.add(snowflake);
+                snowflakes.push(snowflake);
+            }
+        }
+
+        // Create city buildings in the background
+        function createCity() {
+            const buildingMaterial = new THREE.MeshLambertMaterial({ color: 0x333333 });
+            for (let i = 0; i < 10; i++) {
+                const buildingGeometry = new THREE.BoxGeometry(2, Math.random() * 10 + 10, 2);
+                const building = new THREE.Mesh(buildingGeometry, buildingMaterial);
+                building.position.set(i * 6 - 30, building.geometry.parameters.height / 2, -100);
+                scene.add(building);
+                cityBuildings.push(building);
+            }
+        }
+
+        // Update player position
+        function updatePlayerPosition() {
+            if (keys['ArrowLeft'] && currentLane > 0) {
+                currentLane -= 1;
+                player.position.x = lanePositions[currentLane];
+                keys['ArrowLeft'] = false; // Prevent holding key
+            }
+            if (keys['ArrowRight'] && currentLane < 2) {
+                currentLane += 1;
+                player.position.x = lanePositions[currentLane];
+                keys['ArrowRight'] = false; // Prevent holding key
+            }
+        }
+
+        // Animate objects (coins spinning and standing)
+        function animateObjects() {
+            gameObjects.forEach((item) => {
+                item.object.position.z += speed;
+
+                // Coin collection
+                if (
+                    item.type === 'coin' &&
+                    Math.abs(item.object.position.z - player.position.z) < 1 &&
+                    Math.abs(item.object.position.x - player.position.x) < 1
+                ) {
+                    scene.remove(item.object);
+                    gameObjects = gameObjects.filter((obj) => obj !== item);
+                    console.log('Coin collected!');
                 }
+
+                // Spin coins
+                if (item.type === 'coin') {
+                    item.object.rotation.y += 0.05;
+                }
+            });
+
+            // Reset objects that move past the player
+            gameObjects = gameObjects.filter((item) => item.object.position.z < 20);
+            // Continuously spawn new coins
+            if (gameObjects.length < 15) { // Less frequent coin spawning
+                spawnCoins();
             }
-            requestAnimationFrame(update);
         }
 
-        document.addEventListener('keydown', function(event) {
-            if (event.code === 'Space' && !player.jump) {
-                player.jump = true;
-                player.velocityY = 10;
-            }
-        });
+        // Animate snowflakes
+        function animateSnowflakes() {
+            snowflakes.forEach((snowflake) => {
+                snowflake.position.y -= 0.05;
+                if (snowflake.position.y < 0) snowflake.position.y = Math.random() * 10 + 5;
+            });
+        }
 
-        update();
+        // Game loop
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // Update player and objects
+            updatePlayerPosition();
+            animateObjects();
+            animateSnowflakes();
+
+            // Move the player forward
+            player.position.z -= speed;
+
+            // Update camera position
+            camera.position.z = player.position.z + 15;
+
+            // Render scene
+            renderer.render(scene, camera);
+        }
+
+        // Initialize the game
+        init();
     </script>
 </body>
 </html>
