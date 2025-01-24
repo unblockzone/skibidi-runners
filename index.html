@@ -8,7 +8,6 @@
         body {
             margin: 0;
             overflow: hidden;
-            background: #87ceeb; /* Sky blue background */
         }
         canvas {
             display: block;
@@ -17,154 +16,93 @@
 </head>
 <body>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@loaders.gl/core@3.2.8/dist/loaders.gl.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@loaders.gl/obj@3.2.8/dist/loaders.gl.obj.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128/examples/js/loaders/GLTFLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128/examples/js/controls/OrbitControls.js"></script>
     <script>
-        // Core variables
-        let scene, camera, renderer, player, speed, gameObjects, snowflakes;
+        let scene, camera, renderer, player, mixer, clock;
         const keys = {};
 
-        // Initialize game
+        // Initialize Scene
         function init() {
-            // Scene and camera
+            // Scene Setup
             scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x87ceeb); // Light blue background
+
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-            camera.position.set(0, 2, 10);
+            camera.position.set(0, 2, 8);
 
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.shadowMap.enabled = true;
             document.body.appendChild(renderer.domElement);
 
             // Lighting
-            const ambientLight = new THREE.AmbientLight(0xaaaaaa, 0.5);
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
             scene.add(ambientLight);
 
             const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
             directionalLight.position.set(10, 20, 10);
-            directionalLight.castShadow = true;
             scene.add(directionalLight);
 
-            // Road
-            const roadTexture = new THREE.TextureLoader().load(
-                'https://cdn.pixabay.com/photo/2018/01/20/23/50/asphalt-3097194_1280.jpg'
+            // Ground
+            const groundGeometry = new THREE.PlaneGeometry(20, 100);
+            const groundMaterial = new THREE.MeshStandardMaterial({ color: 0x333333 });
+            const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+            ground.rotation.x = -Math.PI / 2;
+            scene.add(ground);
+
+            // Load 3D Player Model
+            const loader = new THREE.GLTFLoader();
+            loader.load(
+                'path/to/your-animated-model.glb', // Replace with the URL of the animated model
+                (gltf) => {
+                    player = gltf.scene;
+                    player.scale.set(1.5, 1.5, 1.5); // Adjust the size
+                    player.position.set(0, 0, 0);
+                    scene.add(player);
+
+                    // Set up animation
+                    mixer = new THREE.AnimationMixer(player);
+                    const action = mixer.clipAction(gltf.animations[0]); // Use the first animation
+                    action.play();
+                },
+                undefined,
+                (error) => console.error('Error loading model:', error)
             );
-            roadTexture.wrapS = roadTexture.wrapT = THREE.RepeatWrapping;
-            roadTexture.repeat.set(1, 100);
 
-            const roadMaterial = new THREE.MeshLambertMaterial({ map: roadTexture });
-            const roadGeometry = new THREE.PlaneGeometry(12, 1000);
-            const road = new THREE.Mesh(roadGeometry, roadMaterial);
-            road.rotation.x = -Math.PI / 2;
-            road.receiveShadow = true;
-            scene.add(road);
+            // Initialize clock for animations
+            clock = new THREE.Clock();
 
-            // Player (Realistic Human Model)
-            const playerGeometry = new THREE.SphereGeometry(0.5, 32, 32);
-            const playerMaterial = new THREE.MeshStandardMaterial({ color: 0xff0000 });
-            player = new THREE.Mesh(playerGeometry, playerMaterial);
-            player.position.set(0, 1, 5);
-            player.castShadow = true;
-            scene.add(player);
-
-            // Coins
-            gameObjects = [];
-            spawnCoins();
-
-            // Snowfall (Particle System)
-            snowflakes = [];
-            spawnSnowflakes();
-
-            // Controls
+            // Keyboard Controls
             window.addEventListener('keydown', (e) => (keys[e.key] = true));
             window.addEventListener('keyup', (e) => (keys[e.key] = false));
 
-            // Start game loop
-            speed = 0.2;
             animate();
         }
 
-        // Spawn coins
-        function spawnCoins() {
-            for (let i = 0; i < 20; i++) {
-                const coinGeometry = new THREE.CylinderGeometry(0.3, 0.3, 0.1, 32);
-                const coinMaterial = new THREE.MeshStandardMaterial({
-                    color: 0xffd700,
-                    metalness: 0.7,
-                    roughness: 0.3,
-                });
-                const coin = new THREE.Mesh(coinGeometry, coinMaterial);
-                coin.rotation.x = Math.PI / 2;
-                coin.position.set(
-                    Math.random() * 8 - 4, // Random lane
-                    0.5,
-                    -Math.random() * 100 // Random distance
-                );
-                coin.castShadow = true;
-                scene.add(coin);
-                gameObjects.push(coin);
-            }
-        }
-
-        // Spawn snowflakes
-        function spawnSnowflakes() {
-            for (let i = 0; i < 200; i++) {
-                const snowflakeGeometry = new THREE.SphereGeometry(0.05, 8, 8);
-                const snowflakeMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff });
-                const snowflake = new THREE.Mesh(snowflakeGeometry, snowflakeMaterial);
-                snowflake.position.set(
-                    Math.random() * 20 - 10,
-                    Math.random() * 10 + 5,
-                    Math.random() * -50
-                );
-                scene.add(snowflake);
-                snowflakes.push(snowflake);
-            }
-        }
-
-        // Update player position
-        function updatePlayer() {
-            if (keys['ArrowLeft'] && player.position.x > -4) {
-                player.position.x -= 0.5;
-            }
-            if (keys['ArrowRight'] && player.position.x < 4) {
-                player.position.x += 0.5;
-            }
-        }
-
-        // Animate coins
-        function animateCoins() {
-            gameObjects.forEach((coin) => {
-                coin.position.z += speed;
-
-                // Coin collection
-                if (Math.abs(player.position.z - coin.position.z) < 1 && Math.abs(player.position.x - coin.position.x) < 1) {
-                    scene.remove(coin);
-                    gameObjects = gameObjects.filter((c) => c !== coin);
-                }
-            });
-        }
-
-        // Animate snowflakes
-        function animateSnowflakes() {
-            snowflakes.forEach((flake) => {
-                flake.position.y -= 0.1;
-                if (flake.position.y < 0) flake.position.y = Math.random() * 10 + 5;
-            });
-        }
-
-        // Game loop
+        // Animate Scene
         function animate() {
             requestAnimationFrame(animate);
-            updatePlayer();
-            animateCoins();
-            animateSnowflakes();
-            player.position.z -= speed;
-            camera.position.z = player.position.z + 10;
+
+            const delta = clock.getDelta(); // Get time since last frame
+
+            // Update animation mixer
+            if (mixer) mixer.update(delta);
+
+            // Move player
+            if (player) {
+                if (keys['ArrowLeft'] && player.position.x > -4) {
+                    player.position.x -= 0.1;
+                }
+                if (keys['ArrowRight'] && player.position.x < 4) {
+                    player.position.x += 0.1;
+                }
+                player.position.z -= 0.2; // Auto-run forward
+                camera.position.z = player.position.z + 8; // Follow the player
+            }
+
             renderer.render(scene, camera);
         }
 
-        // Start game
         init();
     </script>
 </body>
