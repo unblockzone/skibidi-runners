@@ -1,52 +1,187 @@
-
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-
 <head>
-  <meta charset="utf-8">
-  <title>Subway Surfers</title>
-  <link rel="stylesheet" href="../webgl.css" type="text/css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Skibidi Runners</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: linear-gradient(to bottom, #87ceeb, #1e90ff); /* Dynamic gradient */
+        }
+        canvas {
+            display: block;
+        }
+    </style>
 </head>
-
 <body>
-  <div id="wrapper" align="center" style="margin-left:auto; margin-right:auto;">
-    <h1 id="heading"
-      style="background-color: #a59e9a; text-decoration-style: solid; color: #F8F8F8; width: 40%; margin-top: 0px; margin-bottom: 10px; text-align: center;">
-      Subway Surfers</h1>
-    <div id="maze">
-      <div id="c"
-        style="margin-left:auto; margin-right:auto;margin-bottom: 10px;text-align: center;width: 10%;font-size: large">
-      </div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        // Core variables
+        let scene, camera, renderer, player, lanes, currentLane, speed, gameObjects, snowflakes;
+        const lanePositions = [-4, 0, 4]; // Three lanes
+        const keys = {};
 
-      <canvas id="glcanvas" width="1280" height="720" style="margin-left:auto; margin-right:auto">This text is displayed
-        if your browser does not support HTML5 Canvas.</canvas>
-      <div id="timerel"
-        style="margin-left:auto; margin-right:auto;margin-top:0px;text-align: center;width: 15%;font-size: large"></div>
-      <div>
-        <audio src='./assets/Theme.mp3' id="music" loop></audio>
-        <audio src='./assets//Crash.mp3' id="crash"></audio>
-      </div>
-    </div>
+        // Initialize game
+        function init() {
+            // Set up the scene
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            renderer = new THREE.WebGLRenderer();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            document.body.appendChild(renderer.domElement);
+
+            // Light
+            const light = new THREE.DirectionalLight(0xffffff, 1);
+            light.position.set(10, 20, 10);
+            scene.add(light);
+
+            // Road
+            const roadGeometry = new THREE.PlaneGeometry(12, 1000);
+            const roadMaterial = new THREE.MeshLambertMaterial({ color: 0x404040 });
+            const road = new THREE.Mesh(roadGeometry, roadMaterial);
+            road.rotation.x = -Math.PI / 2;
+            scene.add(road);
+
+            // Stickman player
+            const bodyGeometry = new THREE.CylinderGeometry(0.3, 0.3, 2, 16);
+            const bodyMaterial = new THREE.MeshLambertMaterial({ color: 0x000000 });
+            const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+            body.position.y = 1;
+
+            const headGeometry = new THREE.SphereGeometry(0.5, 16, 16);
+            const headMaterial = new THREE.MeshLambertMaterial({ color: 0xffffff });
+            const head = new THREE.Mesh(headGeometry, headMaterial);
+            head.position.y = 2;
+
+            player = new THREE.Group();
+            player.add(body);
+            player.add(head);
+            player.position.set(0, 0, 5);
+            scene.add(player);
+
+            // Variables
+            currentLane = 1; // Start in the middle lane
+            speed = 0.2;
+            gameObjects = [];
+            snowflakes = [];
+
+            // Controls
+            window.addEventListener('keydown', (e) => (keys[e.key] = true));
+            window.addEventListener('keyup', (e) => (keys[e.key] = false));
+
+            // Add objects and snowflakes
+            spawnCoins();
+            spawnSnowflakes();
+
+            // Start the game loop
+            camera.position.set(0, 5, 15);
+            camera.lookAt(player.position);
+            animate();
+        }
+
+        // Spawning coins in lanes
+        function spawnCoins() {
+            const coinGeometry = new THREE.TorusGeometry(0.5, 0.2, 16, 100);
+            const coinMaterial = new THREE.MeshLambertMaterial({ color: 0xffd700 });
+            for (let i = 0; i < 20; i++) {
+                const coin = new THREE.Mesh(coinGeometry, coinMaterial);
+                coin.rotation.x = Math.PI / 2;
+                coin.position.set(
+                    lanePositions[Math.floor(Math.random() * 3)],
+                    0.5,
+                    -Math.random() * 100
+                );
+                scene.add(coin);
+                gameObjects.push({ object: coin, type: 'coin' });
+            }
+        }
+
+        // Spawning snowflakes
+        function spawnSnowflakes() {
+            for (let i = 0; i < 100; i++) {
+                const snowflakeGeometry = new THREE.SphereGeometry(0.1, 8, 8);
+                const snowflakeMaterial = new THREE.MeshLambertMaterial({ color: 0xffffff });
+                const snowflake = new THREE.Mesh(snowflakeGeometry, snowflakeMaterial);
+                snowflake.position.set(
+                    Math.random() * 20 - 10,
+                    Math.random() * 10 + 5,
+                    Math.random() * -50
+                );
+                scene.add(snowflake);
+                snowflakes.push(snowflake);
+            }
+        }
+
+        // Update player position
+        function updatePlayerPosition() {
+            if (keys['ArrowLeft'] && currentLane > 0) {
+                currentLane -= 1;
+                player.position.x = lanePositions[currentLane];
+                keys['ArrowLeft'] = false; // Prevent holding key
+            }
+            if (keys['ArrowRight'] && currentLane < 2) {
+                currentLane += 1;
+                player.position.x = lanePositions[currentLane];
+                keys['ArrowRight'] = false; // Prevent holding key
+            }
+        }
+
+        // Animate objects
+        function animateObjects() {
+            gameObjects.forEach((item) => {
+                item.object.position.z += speed;
+
+                // Coin collection
+                if (
+                    item.type === 'coin' &&
+                    Math.abs(item.object.position.z - player.position.z) < 1 &&
+                    Math.abs(item.object.position.x - player.position.x) < 1
+                ) {
+                    scene.remove(item.object);
+                    gameObjects = gameObjects.filter((obj) => obj !== item);
+                    console.log('Coin collected!');
+                }
+            });
+
+            // Reset objects that move past the player
+            gameObjects = gameObjects.filter((item) => item.object.position.z < 20);
+            // Continuously spawn new coins
+            if (gameObjects.length < 50) {
+                spawnCoins();
+            }
+        }
+
+        // Animate snow
+        function animateSnowflakes() {
+            snowflakes.forEach((snowflake) => {
+                snowflake.position.y -= 0.05;
+                if (snowflake.position.y < 0) snowflake.position.y = Math.random() * 10 + 5;
+            });
+        }
+
+        // Game loop
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // Update player and objects
+            updatePlayerPosition();
+            animateObjects();
+            animateSnowflakes();
+
+            // Move the player forward
+            player.position.z -= speed;
+
+            // Update camera position
+            camera.position.z = player.position.z + 15;
+
+            // Render scene
+            renderer.render(scene, camera);
+        }
+
+        // Initialize the game
+        init();
+    </script>
 </body>
-
-<script src="./gl-matrix.js"></script>
-<script src="./cube.js"></script>
-<script src="./track.js"></script>
-<script src="./wall.js"></script>
-<script src="./city.js"></script>
-<script src="./handlekeys.js"></script>
-<script src="./player.js"></script>
-<script src="./police.js"></script>
-<script src="./dog.js"></script>
-<script src="./coin.js"></script>
-<script src="./train.js"></script>
-<script src="./box.js"></script>
-<script src="./manhole.js"></script>
-<script src="./stop.js"></script>
-<script src="./stand.js"></script>
-<script src="./boots.js"></script>
-<script src="./flying_boost.js"></script>
-<script src="./hoverboard.js"></script>
-<script src="./main.js"></script>
-
 </html>
