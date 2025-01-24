@@ -5,213 +5,167 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Skibidi Runners</title>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Bowlby+One&display=swap');
-
         body {
             margin: 0;
             overflow: hidden;
+            background: #87ceeb; /* Sky blue background */
         }
         canvas {
             display: block;
         }
-
-        /* Loading Screen */
-        #loading-screen {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.8);
-            color: white;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            flex-direction: column;
-            font-family: 'Bowlby One', sans-serif;
-            z-index: 1;
-        }
-        #loading-bar {
-            width: 80%;
-            background-color: #555;
-            height: 20px;
-            border-radius: 10px;
-            margin-top: 20px;
-        }
-        #loading-progress {
-            height: 100%;
-            background-color: #00ff00;
-            border-radius: 10px;
-            width: 0%;
-        }
     </style>
 </head>
 <body>
-    <!-- Loading Screen -->
-    <div id="loading-screen">
-        <div id="loading-text">Skibidi Runners</div>
-        <div id="loading-bar">
-            <div id="loading-progress"></div>
-        </div>
-    </div>
-
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@loaders.gl/core@3.2.8/dist/loaders.gl.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@loaders.gl/obj@3.2.8/dist/loaders.gl.obj.min.js"></script>
     <script>
-        // Game Variables
-        let scene, camera, renderer;
-        let player, speed, score, jumpVelocity, isJumping, gameOver;
-        let coins, obstacles, snowflakes, buildings;
-        let lanes, currentLaneIndex;
-        let keys;
-        let loadingProgress, loadingText, loadingProgressElement;
+        // Core variables
+        let scene, camera, renderer, player, speed, gameObjects, snowflakes;
+        const keys = {};
 
-        // Initialize the game
+        // Initialize game
         function init() {
-            // Scene, Camera, Renderer
+            // Scene and camera
             scene = new THREE.Scene();
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-            renderer = new THREE.WebGLRenderer();
+            camera.position.set(0, 2, 10);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
             document.body.appendChild(renderer.domElement);
 
             // Lighting
-            const light = new THREE.DirectionalLight(0xffffff, 1);
-            light.position.set(5, 10, 5);
-            scene.add(light);
+            const ambientLight = new THREE.AmbientLight(0xaaaaaa, 0.5);
+            scene.add(ambientLight);
 
-            // Road (Three lanes)
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+            directionalLight.position.set(10, 20, 10);
+            directionalLight.castShadow = true;
+            scene.add(directionalLight);
+
+            // Road
+            const roadTexture = new THREE.TextureLoader().load(
+                'https://cdn.pixabay.com/photo/2018/01/20/23/50/asphalt-3097194_1280.jpg'
+            );
+            roadTexture.wrapS = roadTexture.wrapT = THREE.RepeatWrapping;
+            roadTexture.repeat.set(1, 100);
+
+            const roadMaterial = new THREE.MeshLambertMaterial({ map: roadTexture });
             const roadGeometry = new THREE.PlaneGeometry(12, 1000);
-            const roadMaterial = new THREE.MeshLambertMaterial({ color: 0x808080 });
             const road = new THREE.Mesh(roadGeometry, roadMaterial);
             road.rotation.x = -Math.PI / 2;
+            road.receiveShadow = true;
             scene.add(road);
 
-            // Player
-            const playerGeometry = new THREE.CylinderGeometry(0.5, 0.5, 2, 32);
-            const playerMaterial = new THREE.MeshLambertMaterial({ color: 0x0000ff });
+            // Player (Realistic Human Model)
+            const playerGeometry = new THREE.SphereGeometry(0.5, 32, 32);
+            const playerMaterial = new THREE.MeshStandardMaterial({ color: 0xff0000 });
             player = new THREE.Mesh(playerGeometry, playerMaterial);
-            player.position.y = 1;
+            player.position.set(0, 1, 5);
+            player.castShadow = true;
             scene.add(player);
 
-            // Initialize game variables
-            coins = [];
-            obstacles = [];
-            snowflakes = [];
-            buildings = [];
-            lanes = [-4, 0, 4];
-            currentLaneIndex = 1; // Start in the middle lane
-            speed = 0.2;
-            score = 0;
-            isJumping = false;
-            jumpVelocity = 0;
-            gameOver = false;
+            // Coins
+            gameObjects = [];
+            spawnCoins();
 
-            // Generate buildings on the sides
-            createBuildings();
+            // Snowfall (Particle System)
+            snowflakes = [];
+            spawnSnowflakes();
 
             // Controls
-            keys = {};
-            window.addEventListener("keydown", (event) => {
-                keys[event.key] = true;
-            });
-            window.addEventListener("keyup", (event) => {
-                keys[event.key] = false;
-            });
+            window.addEventListener('keydown', (e) => (keys[e.key] = true));
+            window.addEventListener('keyup', (e) => (keys[e.key] = false));
 
-            // Game loop
-            gameLoop();
-        }
-
-        // Loading progress and setup
-        loadingProgress = 0;
-        loadingText = document.getElementById("loading-text");
-        loadingProgressElement = document.getElementById("loading-progress");
-
-        // Loading screen loop
-        const loadGame = () => {
-            if (loadingProgress < 100) {
-                loadingProgress += 0.5;
-                loadingProgressElement.style.width = loadingProgress + "%";
-                requestAnimationFrame(loadGame);
-            } else {
-                document.getElementById("loading-screen").style.display = "none";
-                init();
-            }
-        };
-
-        // Restart the game
-        function restartGame() {
-            // Clear existing objects and reset variables
-            scene.clear();
-
-            // Reset game state
-            player.position.set(0, 1, 0);
+            // Start game loop
             speed = 0.2;
-            score = 0;
-            isJumping = false;
-            jumpVelocity = 0;
-            gameOver = false;
-
-            // Reset coins, obstacles, and snowflakes
-            coins.forEach(coin => scene.remove(coin));
-            obstacles.forEach(obstacle => scene.remove(obstacle));
-            snowflakes.forEach(snowflake => scene.remove(snowflake));
-            buildings.forEach(building => scene.remove(building));
-
-            coins = [];
-            obstacles = [];
-            snowflakes = [];
-            buildings = [];
-
-            // Generate buildings on the sides
-            createBuildings();
-
-            // Restart the game loop
-            gameLoop();
+            animate();
         }
 
-        // Game Loop
-        function gameLoop() {
-            requestAnimationFrame(gameLoop);
-
-            if (gameOver) {
-                setTimeout(() => {
-                    restartGame();
-                }, 2000); // Restart after a short delay
-                return;
+        // Spawn coins
+        function spawnCoins() {
+            for (let i = 0; i < 20; i++) {
+                const coinGeometry = new THREE.CylinderGeometry(0.3, 0.3, 0.1, 32);
+                const coinMaterial = new THREE.MeshStandardMaterial({
+                    color: 0xffd700,
+                    metalness: 0.7,
+                    roughness: 0.3,
+                });
+                const coin = new THREE.Mesh(coinGeometry, coinMaterial);
+                coin.rotation.x = Math.PI / 2;
+                coin.position.set(
+                    Math.random() * 8 - 4, // Random lane
+                    0.5,
+                    -Math.random() * 100 // Random distance
+                );
+                coin.castShadow = true;
+                scene.add(coin);
+                gameObjects.push(coin);
             }
+        }
 
-            // Move objects and handle game logic
-            // Logic for player movement, spawning coins, obstacles, snow, and buildings
+        // Spawn snowflakes
+        function spawnSnowflakes() {
+            for (let i = 0; i < 200; i++) {
+                const snowflakeGeometry = new THREE.SphereGeometry(0.05, 8, 8);
+                const snowflakeMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff });
+                const snowflake = new THREE.Mesh(snowflakeGeometry, snowflakeMaterial);
+                snowflake.position.set(
+                    Math.random() * 20 - 10,
+                    Math.random() * 10 + 5,
+                    Math.random() * -50
+                );
+                scene.add(snowflake);
+                snowflakes.push(snowflake);
+            }
+        }
 
-            // Camera follow player
-            camera.position.set(player.position.x, player.position.y + 5, player.position.z + 10);
-            camera.lookAt(player.position);
+        // Update player position
+        function updatePlayer() {
+            if (keys['ArrowLeft'] && player.position.x > -4) {
+                player.position.x -= 0.5;
+            }
+            if (keys['ArrowRight'] && player.position.x < 4) {
+                player.position.x += 0.5;
+            }
+        }
 
-            // Render the scene
+        // Animate coins
+        function animateCoins() {
+            gameObjects.forEach((coin) => {
+                coin.position.z += speed;
+
+                // Coin collection
+                if (Math.abs(player.position.z - coin.position.z) < 1 && Math.abs(player.position.x - coin.position.x) < 1) {
+                    scene.remove(coin);
+                    gameObjects = gameObjects.filter((c) => c !== coin);
+                }
+            });
+        }
+
+        // Animate snowflakes
+        function animateSnowflakes() {
+            snowflakes.forEach((flake) => {
+                flake.position.y -= 0.1;
+                if (flake.position.y < 0) flake.position.y = Math.random() * 10 + 5;
+            });
+        }
+
+        // Game loop
+        function animate() {
+            requestAnimationFrame(animate);
+            updatePlayer();
+            animateCoins();
+            animateSnowflakes();
+            player.position.z -= speed;
+            camera.position.z = player.position.z + 10;
             renderer.render(scene, camera);
         }
 
-        // Create buildings on the sides
-        function createBuildings() {
-            const buildingGeometry = new THREE.BoxGeometry(2, 6, 2);
-            const buildingMaterial = new THREE.MeshLambertMaterial({ color: 0xaaaaaa });
-
-            for (let i = 0; i < 20; i++) {
-                const leftBuilding = new THREE.Mesh(buildingGeometry, buildingMaterial);
-                leftBuilding.position.set(-8, 3, -i * 10);
-                scene.add(leftBuilding);
-                buildings.push(leftBuilding);
-
-                const rightBuilding = new THREE.Mesh(buildingGeometry, buildingMaterial);
-                rightBuilding.position.set(8, 3, -i * 10);
-                scene.add(rightBuilding);
-                buildings.push(rightBuilding);
-            }
-        }
-
-        // Start loading the game
-        loadGame();
+        // Start game
+        init();
     </script>
 </body>
 </html>
